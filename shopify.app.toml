@@ -1,7 +1,7 @@
 [application]
 name = "Commission Manager"
-client_id = "81b012291a5f6e998644a86ad2f2b56e"
-application_url = "https://d38cbf299a51.ngrok-free.app"
+client_id = "81e3caa4c1e56b7c9dc6a25bd2e78853"
+application_url = "https://twiva-commerce-shopify.vercel.app"
 embedded = true
 
 [application.pos]
@@ -12,7 +12,7 @@ scopes = "read_products,write_products,read_collections"
 
 [auth]
 redirect_urls = [
-  "https://d38cbf299a51.ngrok-free.app/api/auth/callback"
+  "https://twiva-commerce-shopify.vercel.app/api/auth/callback"
 ]
 
 [webhooks]
