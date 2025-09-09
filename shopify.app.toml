@@ -1,6 +1,6 @@
 [application]
 name = "Commission Manager"
-client_id = "81e3caa4c1e56b7c9dc6a25bd2e78853"
+client_id = "e81a378169460e05b6dc74fe0bce85b0"
 application_url = "https://twiva-commerce-shopify.vercel.app"
 embedded = true
 
