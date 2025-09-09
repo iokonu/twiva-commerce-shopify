@@ -1,0 +1,19 @@
+[application]
+name = "Commission Manager"
+client_id = "81b012291a5f6e998644a86ad2f2b56e"
+application_url = "https://d38cbf299a51.ngrok-free.app"
+embedded = true
+
+[application.pos]
+embedded = false
+
+[access_scopes]
+scopes = "read_products,write_products,read_collections"
+
+[auth]
+redirect_urls = [
+  "https://d38cbf299a51.ngrok-free.app/api/auth/callback"
+]
+
+[webhooks]
+api_version = "2023-10"
