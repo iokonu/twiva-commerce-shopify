@@ -39,6 +39,25 @@ export default async function handler(req, res) {
       },
     });
 
+    // Test token validity with a simple query first
+    try {
+      await client.query({
+        data: {
+          query: `query { shop { name } }`
+        }
+      });
+    } catch (error) {
+      if (error.response?.code === 401) {
+        // Token is invalid, redirect to re-auth
+        return res.status(401).json({ 
+          error: 'Access token expired. Please re-authenticate.',
+          authUrl: `/api/auth?shop=${shop}`,
+          tokenExpired: true
+        });
+      }
+      throw error; // Re-throw if it's not a 401
+    }
+
     let totalPotentialEarnings = 0;
     let totalCommissions = productCommissions.length;
     let percentageCommissions = [];
