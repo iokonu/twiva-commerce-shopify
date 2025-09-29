@@ -1,5 +1,5 @@
-import { prisma } from '../../../lib/prisma';
 import crypto from 'crypto';
+import apiClient from '../../../lib/api-client';
 
 export default async function handler(req, res) {
   try {
@@ -42,17 +42,21 @@ export default async function handler(req, res) {
 
     const tokenData = await tokenResponse.json();
     
-    await prisma.shop.upsert({
-      where: { id: shop },
-      update: {
-        accessToken: tokenData.access_token,
-      },
-      create: {
+    // Register/update shop with backend and store access token in session/memory
+    try {
+      await apiClient.registerShop({
         id: shop,
         domain: shop,
-        accessToken: tokenData.access_token,
-      },
-    });
+        name: shop, // We can get actual shop name later if needed
+        accessToken: tokenData.access_token
+      });
+    } catch (error) {
+      console.error('Failed to register shop with backend:', error);
+      // Continue anyway - the shop might already be registered
+    }
+
+    // Store access token in a way that can be retrieved later
+    // For now, we'll need to rely on the shopify-helpers to handle token storage
 
     const redirectUrl = `/?shop=${shop}&host=${host || ''}`;
     res.writeHead(302, { Location: redirectUrl });

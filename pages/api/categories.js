@@ -1,6 +1,5 @@
-import shopify from '../../lib/shopify';
-import { prisma } from '../../lib/prisma';
 import { PRODUCTS_QUERY } from '../../lib/graphql';
+import { getShopifyClient } from '../../lib/shopify-helpers';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -14,29 +13,14 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Shop parameter required' });
     }
 
-    const shopRecord = await prisma.shop.upsert({
-      where: { id: shop },
-      update: {},
-      create: {
-        id: shop,
-        domain: shop,
-        accessToken: 'temp_token',
-      },
-    });
+    const client = await getShopifyClient(shop);
 
-    if (!shopRecord.accessToken || shopRecord.accessToken === 'temp_token') {
-      return res.status(401).json({ 
+    if (!client) {
+      return res.status(401).json({
         error: 'Shopify authentication required',
-        authUrl: `/api/auth?shop=${shop}` 
+        authUrl: `/api/auth?shop=${shop}`
       });
     }
-
-    const client = new shopify.clients.Graphql({
-      session: {
-        shop: shopRecord.domain,
-        accessToken: shopRecord.accessToken,
-      },
-    });
 
     let allProducts = [];
     let hasNextPage = true;

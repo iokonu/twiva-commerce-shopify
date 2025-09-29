@@ -33,9 +33,7 @@ yarn-error.log*
 # Typescript
 *.tsbuildinfo
 
-# Database
-prisma/dev.db
-prisma/dev.db-journal
+# Database (removed - no longer using local database)
 
 # IDE
 .vscode/

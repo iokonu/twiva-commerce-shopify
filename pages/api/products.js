@@ -1,7 +1,6 @@
-import shopify from '../../lib/shopify';
-import { prisma } from '../../lib/prisma';
 import { PRODUCTS_QUERY } from '../../lib/graphql';
-import { getProductCommission } from '../../lib/commissions';
+import { getShopifyClient } from '../../lib/shopify-helpers';
+import { getProductCommission } from '../../lib/backend-commissions';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -15,29 +14,14 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Shop parameter required' });
     }
 
-    const shopRecord = await prisma.shop.upsert({
-      where: { id: shop },
-      update: {},
-      create: {
-        id: shop,
-        domain: shop,
-        accessToken: 'temp_token',
-      },
-    });
+    const client = await getShopifyClient(shop);
 
-    if (!shopRecord.accessToken || shopRecord.accessToken === 'temp_token') {
-      return res.status(401).json({ 
+    if (!client) {
+      return res.status(401).json({
         error: 'Shopify authentication required',
-        authUrl: `/api/auth?shop=${shop}` 
+        authUrl: `/api/auth?shop=${shop}`
       });
     }
-
-    const client = new shopify.clients.Graphql({
-      session: {
-        shop: shopRecord.domain,
-        accessToken: shopRecord.accessToken,
-      },
-    });
 
     const response = await client.query({
       data: {
@@ -55,9 +39,9 @@ export default async function handler(req, res) {
     // Only enrich with commission data, don't save all products to database
     const enrichedProducts = await Promise.all(
       products.map(async (product) => {
-        const productLink = `https://${shopRecord.domain}/products/${product.handle}`;
+        const productLink = `https://${shop}/products/${product.handle}`;
         const commissionData = await getProductCommission(shop, product.id);
-        
+
         return {
           ...product,
           link: productLink,

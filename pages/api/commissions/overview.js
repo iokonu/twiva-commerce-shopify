@@ -1,5 +1,5 @@
-import { prisma } from '../../../lib/prisma';
-import shopify from '../../../lib/shopify';
+import apiClient from '../../../lib/api-client';
+import { getShopifyClient } from '../../../lib/shopify-helpers';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -13,31 +13,41 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Shop parameter required' });
     }
 
-    // Check if we have a valid access token
-    const shopRecord = await prisma.shop.findUnique({
-      where: { id: shop }
-    });
-
-    if (!shopRecord || !shopRecord.accessToken || shopRecord.accessToken === 'temp_token') {
-      return res.status(401).json({ 
-        error: 'Shopify authentication required',
-        authUrl: `/api/auth?shop=${shop}` 
+    try {
+      // Check shop registration status through backend API
+      const validationStatus = await apiClient.getValidationStatus(shop);
+      if (!validationStatus.success) {
+        return res.status(401).json({
+          error: 'Shop not registered with backend',
+          authUrl: `/api/auth?shop=${shop}`
+        });
+      }
+    } catch (error) {
+      return res.status(401).json({
+        error: 'Shop validation failed',
+        authUrl: `/api/auth?shop=${shop}`
       });
     }
 
-    // Get all commission data (only product commissions now)
-    const productCommissions = await prisma.productCommission.findMany({
-      where: { shopId: shop },
-      orderBy: { createdAt: 'desc' }
-    });
+    // Get all commission data from backend API
+    let productCommissions = [];
+    try {
+      const commissionsResponse = await apiClient.getCommissions(shop);
+      productCommissions = commissionsResponse.data || [];
+    } catch (error) {
+      console.error('Failed to fetch commissions from backend:', error);
+      productCommissions = [];
+    }
 
-    // Create GraphQL client to fetch additional data
-    const client = new shopify.clients.Graphql({
-      session: {
-        shop: shopRecord.domain,
-        accessToken: shopRecord.accessToken,
-      },
-    });
+    // Create Shopify GraphQL client
+    const client = await getShopifyClient(shop);
+
+    if (!client) {
+      return res.status(401).json({
+        error: 'Shopify authentication required',
+        authUrl: `/api/auth?shop=${shop}`
+      });
+    }
 
     // Test token validity with a simple query first
     try {

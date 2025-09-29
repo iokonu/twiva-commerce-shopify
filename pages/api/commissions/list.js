@@ -1,5 +1,5 @@
-import { prisma } from '../../../lib/prisma';
-import shopify from '../../../lib/shopify';
+import apiClient from '../../../lib/api-client';
+import { getShopifyClient } from '../../../lib/shopify-helpers';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -13,41 +13,34 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Shop parameter required' });
     }
 
-    const shopRecord = await prisma.shop.findUnique({
-      where: { id: shop }
-    });
-
-    if (!shopRecord || !shopRecord.accessToken || shopRecord.accessToken === 'temp_token') {
-      return res.status(401).json({ 
-        error: 'Shopify authentication required',
-        authUrl: `/api/auth?shop=${shop}` 
+    // Get commissions from backend API
+    let commissionsResponse;
+    try {
+      commissionsResponse = await apiClient.getCommissions(shop);
+    } catch (error) {
+      return res.status(401).json({
+        error: 'Shop not registered with backend',
+        authUrl: `/api/auth?shop=${shop}`
       });
     }
 
     const pageNum = parseInt(page);
     const limitNum = parseInt(limit);
     const skip = (pageNum - 1) * limitNum;
-    
-    const [productCommissions, totalCount] = await Promise.all([
-      prisma.productCommission.findMany({
-        where: { shopId: shop },
-        orderBy: { createdAt: 'desc' },
-        skip: skip,
-        take: limitNum
-      }),
-      prisma.productCommission.count({
-        where: { shopId: shop }
-      })
-    ]);
-    
+
+    const allCommissions = commissionsResponse.data || [];
+    const productCommissions = allCommissions.slice(skip, skip + limitNum);
+    const totalCount = allCommissions.length;
     const totalPages = Math.ceil(totalCount / limitNum);
 
-    const client = new shopify.clients.Graphql({
-      session: {
-        shop: shopRecord.domain,
-        accessToken: shopRecord.accessToken,
-      },
-    });
+    const client = await getShopifyClient(shop);
+
+    if (!client) {
+      return res.status(401).json({
+        error: 'Shopify authentication required',
+        authUrl: `/api/auth?shop=${shop}`
+      });
+    }
 
     const productIds = productCommissions.map(c => c.productId);
 
