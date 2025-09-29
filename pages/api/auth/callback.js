@@ -1,6 +1,5 @@
 import crypto from 'crypto';
-import apiClient from '../../../lib/api-client';
-import { storeAccessToken } from '../../../lib/token-storage';
+import { storeAccessTokenInBackend } from '../../../lib/shopify-helpers';
 
 export default async function handler(req, res) {
   try {
@@ -43,21 +42,17 @@ export default async function handler(req, res) {
 
     const tokenData = await tokenResponse.json();
     
-    // Register/update shop with backend and store access token in session/memory
+    // Store access token in backend API
     try {
-      await apiClient.registerShop({
-        id: shop,
+      await storeAccessTokenInBackend(shop, tokenData.access_token, {
         domain: shop,
         name: shop, // We can get actual shop name later if needed
-        accessToken: tokenData.access_token
       });
+      console.log(`Stored access token for shop: ${shop}`);
     } catch (error) {
-      console.error('Failed to register shop with backend:', error);
-      // Continue anyway - the shop might already be registered
+      console.error('Failed to store access token in backend:', error);
+      throw error; // This is critical - if we can't store the token, auth fails
     }
-
-    // Store access token in memory for later retrieval
-    storeAccessToken(shop, tokenData.access_token);
 
     const redirectUrl = `/?shop=${shop}&host=${host || ''}`;
     res.writeHead(302, { Location: redirectUrl });
