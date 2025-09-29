@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import apiClient from '../../../lib/api-client';
+import { storeAccessToken } from '../../../lib/token-storage';
 
 export default async function handler(req, res) {
   try {
@@ -55,8 +56,8 @@ export default async function handler(req, res) {
       // Continue anyway - the shop might already be registered
     }
 
-    // Store access token in a way that can be retrieved later
-    // For now, we'll need to rely on the shopify-helpers to handle token storage
+    // Store access token in memory for later retrieval
+    storeAccessToken(shop, tokenData.access_token);
 
     const redirectUrl = `/?shop=${shop}&host=${host || ''}`;
     res.writeHead(302, { Location: redirectUrl });
