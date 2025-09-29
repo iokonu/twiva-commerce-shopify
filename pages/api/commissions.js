@@ -1,4 +1,4 @@
-import { setProductCommission, setCollectionCommission, setCategoryCommission, removeCommission } from '../../lib/commissions';
+import { setProductCommission, setCollectionCommission, setCategoryCommission, removeCommission } from '../../lib/backend-commissions';
 
 export default async function handler(req, res) {
   const { shop } = req.query;

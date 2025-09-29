@@ -7,6 +7,7 @@ import { ProductTable } from '../components/ProductTable';
 import { CategoryCommissionForm } from '../components/CategoryCommissionForm';
 import { ProductCategoryForm } from '../components/ProductCategoryForm';
 import { CommissionsOverview } from '../components/CommissionsOverview';
+import ShopVerification from '../components/ShopVerification';
 
 export default function Home() {
   const router = useRouter();
@@ -21,6 +22,7 @@ export default function Home() {
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+  const [isShopVerified, setIsShopVerified] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [pagination, setPagination] = useState({
     products: { hasNext: false, hasPrevious: false, cursor: null },
@@ -67,6 +69,9 @@ export default function Home() {
       const searchParam = debouncedSearchTerm ? `&search=${encodeURIComponent(debouncedSearchTerm)}` : '';
       
       if (selectedTab === 0) {
+        // Shop verification tab - no API calls needed
+        return;
+      } else if (selectedTab === 1) {
         // Load overview/stats
         const response = await fetch(`/api/commissions/overview?shop=${shop}`);
         if (response.status === 401) {
@@ -75,7 +80,7 @@ export default function Home() {
               headers: { 'Accept': 'application/json' }
             });
             const { authUrl } = await authResponse.json();
-            
+
             const redirect = Redirect.create(app);
             redirect.dispatch(Redirect.Action.REMOTE, authUrl);
             return;
@@ -91,7 +96,7 @@ export default function Home() {
         }
         const data = await response.json();
         setStats(data);
-      } else if (selectedTab === 1) {
+      } else if (selectedTab === 2) {
         const response = await fetch(`/api/products?shop=${shop}${searchParam}`);
         if (response.status === 401) {
           try {
@@ -370,6 +375,7 @@ export default function Home() {
   };
 
   const tabs = [
+    { id: 'verification', content: 'Shop Setup', panelID: 'verification-panel' },
     { id: 'overview', content: 'Overview', panelID: 'overview-panel' },
     { id: 'products', content: 'Products', panelID: 'products-panel' },
     { id: 'collections', content: 'Collections', panelID: 'collections-panel' },
@@ -431,13 +437,20 @@ export default function Home() {
                 ) : (
                   <BlockStack gap="400">
                     {selectedTab === 0 && (
+                      <ShopVerification
+                        shopId={shop}
+                        onVerificationComplete={() => setIsShopVerified(true)}
+                      />
+                    )}
+
+                    {selectedTab === 1 && (
                       <CommissionsOverview
                         stats={stats}
                         onRefresh={loadData}
                       />
                     )}
-                    
-                    {selectedTab === 1 && (
+
+                    {selectedTab === 2 && (
                       <BlockStack gap="400">
                         <ProductTable
                           products={products}
