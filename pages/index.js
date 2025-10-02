@@ -21,10 +21,13 @@ export default function Home({ host: hostProp, shop: shopProp }) {
   
   const { shop, host } = router.query;
 
+  // Ensure shop format consistency
+  const shopId = shop || shopProp;
+
   useEffect(() => {
-    if (!shop) return;
+    if (!shopId) return;
     checkAuthAndLoadData();
-  }, [shop, selectedTab]);
+  }, [shopId, selectedTab]);
 
   useEffect(() => {
     // Load commission rates on component mount
@@ -70,7 +73,7 @@ export default function Home({ host: hostProp, shop: shopProp }) {
 
     try {
       // Use simple products API - same pattern as verification
-      const response = await fetch(`/api/products-simple?shop=${shop}`);
+      const response = await fetch(`/api/products-simple?shop=${shopId}`);
       const data = await response.json();
 
       if (data.success) {
@@ -185,7 +188,7 @@ export default function Home({ host: hostProp, shop: shopProp }) {
                   <BlockStack gap="400">
                     {selectedTab === 0 && (
                       <ShopVerification
-                        shopId={shop}
+                        shopId={shopId}
                         onVerificationComplete={() => setIsShopVerified(true)}
                       />
                     )}

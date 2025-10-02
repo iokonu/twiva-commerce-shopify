@@ -17,22 +17,27 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Shop parameter required' });
     }
 
-    // Get token for THIS shop
-    const accessToken = getAccessToken(shop);
-    if (!accessToken) {
-      // Try different format
-      const shopAlt = shop.includes('.') ? shop.replace('.myshopify.com', '') : `${shop}.myshopify.com`;
-      const altToken = getAccessToken(shopAlt);
+    // Get token for THIS shop - try both formats
+    let accessToken = getAccessToken(shop);
 
-      if (!altToken) {
-        return res.status(401).json({
-          success: false,
-          error: `No access token found for shop: ${shop}`
-        });
-      }
+    if (!accessToken) {
+      // Try the full domain format
+      const fullDomain = shop.includes('.') ? shop : `${shop}.myshopify.com`;
+      accessToken = getAccessToken(fullDomain);
     }
 
-    const finalToken = accessToken || getAccessToken(shop.includes('.') ? shop.replace('.myshopify.com', '') : `${shop}.myshopify.com`);
+    if (!accessToken) {
+      // Try the short format
+      const shortName = shop.includes('.') ? shop.replace('.myshopify.com', '') : shop;
+      accessToken = getAccessToken(shortName);
+    }
+
+    if (!accessToken) {
+      return res.status(401).json({
+        success: false,
+        error: `No access token found for shop: ${shop}`
+      });
+    }
 
     // Get products from THIS shop's Shopify
     const shopDomain = shop.includes('.') ? shop : `${shop}.myshopify.com`;
@@ -40,7 +45,7 @@ export default async function handler(req, res) {
 
     const shopifyResponse = await fetch(shopifyUrl, {
       headers: {
-        'X-Shopify-Access-Token': finalToken,
+        'X-Shopify-Access-Token': accessToken,
         'Content-Type': 'application/json',
       },
     });
