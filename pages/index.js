@@ -5,8 +5,6 @@ import { SyncIcon, AlertTriangleIcon } from '@shopify/polaris-icons';
 import { useAppBridge } from '@shopify/app-bridge-react';
 import { Redirect } from '@shopify/app-bridge/actions';
 import ShopVerification from '../components/ShopVerification';
-import productSyncManager from '../lib/product-sync-manager';
-import commissionCalculator from '../lib/commission-calculator';
 
 export default function Home() {
   const router = useRouter();
@@ -19,7 +17,6 @@ export default function Home() {
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [isShopVerified, setIsShopVerified] = useState(false);
-  const [syncStatus, setSyncStatus] = useState({});
   
   const { shop, host } = router.query;
 
@@ -30,8 +27,7 @@ export default function Home() {
 
   useEffect(() => {
     // Load commission rates on component mount
-    const rates = commissionCalculator.getAllCategories();
-    setCommissionRates(rates);
+    loadCommissionRates();
   }, []);
 
   const checkAuthAndLoadData = async () => {
@@ -53,15 +49,10 @@ export default function Home() {
     setError(null);
 
     try {
-      // Get sync status first
-      const status = productSyncManager.getSyncStatus(shop);
-      setSyncStatus(status);
+      // Use the sync-products API endpoint
+      const response = await fetch(`/api/sync-products?shop=${shop}`);
 
-      // Sync products from Shopify to backend, then get from backend
-      const backendProducts = await productSyncManager.syncAndFetchProducts(shop);
-      setProducts(backendProducts);
-    } catch (err) {
-      if (err.message.includes('authentication') || err.message.includes('401')) {
+      if (response.status === 401) {
         try {
           const authResponse = await fetch(`/api/auth?shop=${shop}&host=${host}`, {
             headers: { 'Accept': 'application/json' }
@@ -77,6 +68,15 @@ export default function Home() {
         }
         return;
       }
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to sync products');
+      }
+
+      const data = await response.json();
+      setProducts(data.products || []);
+    } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
@@ -86,7 +86,11 @@ export default function Home() {
   const handleForceSync = async () => {
     setSyncing(true);
     try {
-      await productSyncManager.syncAndFetchProducts(shop, { forceRefresh: true });
+      const response = await fetch(`/api/sync-products?shop=${shop}&force=true`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to sync products');
+      }
       await loadProducts();
     } catch (err) {
       setError(err.message);
@@ -202,32 +206,30 @@ export default function Home() {
                             columnContentTypes={['text', 'text', 'text', 'text', 'text', 'text', 'text']}
                             headings={['Product', 'Type', 'Vendor', 'Price', 'Commission Rate', 'Commission Value', 'Category Status']}
                             rows={getFilteredProducts().map(product => {
-                              const commission = commissionCalculator.calculateCommissionValue(product);
+                              // Simple commission calculation for display
+                              const price = product.variants?.edges?.[0]?.node?.price || 0;
+                              const rate = 15; // Default rate for now
+                              const value = (parseFloat(price) * rate) / 100;
+
                               return [
                                 product.title || 'Untitled',
                                 product.productType || 'N/A',
                                 product.vendor || 'N/A',
-                                `$${commission.price.toFixed(2)}`,
-                                `${commission.rate}%`,
-                                `$${commission.value.toFixed(2)}`,
-                                commission.isDefault ? (
-                                  <Badge tone="attention" icon={<Icon source={AlertTriangleIcon} />}>
-                                    Uncategorized (15% default)
-                                  </Badge>
-                                ) : (
-                                  <Badge tone="success">
-                                    {commission.category} - {commission.subcategory}
-                                  </Badge>
-                                )
+                                `$${parseFloat(price).toFixed(2)}`,
+                                `${rate}%`,
+                                `$${value.toFixed(2)}`,
+                                <Badge tone="attention" icon={<Icon source={AlertTriangleIcon} />}>
+                                  Uncategorized (15% default)
+                                </Badge>
                               ];
                             })}
                           />
                         </Card>
 
-                        {getFilteredProducts().filter(p => commissionCalculator.calculateCommissionRate(p).isDefault).length > 0 && (
+                        {getFilteredProducts().length > 0 && (
                           <Banner status="warning">
                             <Text as="p">
-                              {getFilteredProducts().filter(p => commissionCalculator.calculateCommissionRate(p).isDefault).length} products are uncategorized and using the default 15% commission rate.
+                              {getFilteredProducts().length} products are using the default 15% commission rate.
                               Please categorize your products in Shopify using product types or tags to get better commission rates.
                             </Text>
                           </Banner>
