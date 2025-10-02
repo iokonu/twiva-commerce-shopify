@@ -6,7 +6,7 @@ import { useAppBridge } from '@shopify/app-bridge-react';
 import { Redirect } from '@shopify/app-bridge/actions';
 import ShopVerification from '../components/ShopVerification';
 
-export default function Home() {
+export default function Home({ host: hostProp, shop: shopProp }) {
   const router = useRouter();
   const app = useAppBridge();
   const [selectedTab, setSelectedTab] = useState(0);
@@ -17,6 +17,7 @@ export default function Home() {
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [isShopVerified, setIsShopVerified] = useState(false);
+  const [syncStatus, setSyncStatus] = useState({ inProgress: false });
   
   const { shop, host } = router.query;
 
@@ -68,33 +69,15 @@ export default function Home() {
     setError(null);
 
     try {
-      // Use the sync-products API endpoint
-      const response = await fetch(`/api/sync-products?shop=${shop}`);
-
-      if (response.status === 401) {
-        try {
-          const authResponse = await fetch(`/api/auth?shop=${shop}&host=${host}`, {
-            headers: { 'Accept': 'application/json' }
-          });
-          const { authUrl } = await authResponse.json();
-
-          const redirect = Redirect.create(app);
-          redirect.dispatch(Redirect.Action.REMOTE, authUrl);
-          return;
-        } catch (authError) {
-          console.error('Auth redirect error:', authError);
-          setError('Authentication required. Please reload the app.');
-        }
-        return;
-      }
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to sync products');
-      }
-
+      // Use simple products API - same pattern as verification
+      const response = await fetch(`/api/products-simple?shop=${shop}`);
       const data = await response.json();
-      setProducts(data.products || []);
+
+      if (data.success) {
+        setProducts(data.products || []);
+      } else {
+        setError(data.error || 'Failed to load products');
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -105,11 +88,6 @@ export default function Home() {
   const handleForceSync = async () => {
     setSyncing(true);
     try {
-      const response = await fetch(`/api/sync-products?shop=${shop}&force=true`);
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to sync products');
-      }
       await loadProducts();
     } catch (err) {
       setError(err.message);
@@ -124,7 +102,7 @@ export default function Home() {
     return products.filter(product =>
       product.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       product.handle?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.productType?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      product.product_type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       product.vendor?.toLowerCase().includes(searchTerm.toLowerCase())
     );
   };
@@ -225,14 +203,14 @@ export default function Home() {
                             columnContentTypes={['text', 'text', 'text', 'text', 'text', 'text', 'text']}
                             headings={['Product', 'Type', 'Vendor', 'Price', 'Commission Rate', 'Commission Value', 'Category Status']}
                             rows={getFilteredProducts().map(product => {
-                              // Simple commission calculation for display
-                              const price = product.variants?.edges?.[0]?.node?.price || 0;
+                              // Simple commission calculation for display - REST API format
+                              const price = product.variants?.[0]?.price || 0;
                               const rate = 15; // Default rate for now
                               const value = (parseFloat(price) * rate) / 100;
 
                               return [
                                 product.title || 'Untitled',
-                                product.productType || 'N/A',
+                                product.product_type || 'N/A',
                                 product.vendor || 'N/A',
                                 `$${parseFloat(price).toFixed(2)}`,
                                 `${rate}%`,
@@ -293,6 +271,7 @@ export async function getServerSideProps({ query }) {
   return {
     props: {
       host: query.host || null,
+      shop: query.shop || null,
     },
   };
 }

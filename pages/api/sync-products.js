@@ -63,7 +63,7 @@ export default async function handler(req, res) {
     const response = await client.query({
       data: {
         query,
-        variables: { first: 10 }
+        variables: { first: 50 }
       }
     });
 
