@@ -15,11 +15,12 @@ export default function ShopVerification({ shopId, onVerificationComplete }) {
   }, [shopId]);
 
   useEffect(() => {
+    // Update countdown timer
     const interval = setInterval(() => {
       if (verificationStatus && !verificationStatus.is_validated && verificationStatus.minutes_remaining > 0) {
         setMinutesRemaining(prev => Math.max(0, prev - 1));
       }
-    }, 60000);
+    }, 60000); // Update every minute
 
     return () => clearInterval(interval);
   }, [verificationStatus]);
@@ -58,6 +59,7 @@ export default function ShopVerification({ shopId, onVerificationComplete }) {
         setOneTimeCode(response.one_time_code);
         setMinutesRemaining(response.expires_in_minutes || 30);
 
+        // Update verification status
         setVerificationStatus(prev => ({
           ...prev,
           one_time_code: response.one_time_code,
@@ -88,7 +90,6 @@ export default function ShopVerification({ shopId, onVerificationComplete }) {
     );
   }
 
-  //
   if (verificationStatus?.is_validated) {
     return (
       <Card>
