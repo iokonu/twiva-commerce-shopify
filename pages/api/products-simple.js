@@ -18,15 +18,8 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Shop parameter required' });
     }
 
-    // Step 1: Get products from Shopify (like verification gets shop data)
+    // Step 1: Get products from Shopify (using normal process)
     const accessToken = getAccessToken(shop);
-    if (!accessToken) {
-      return res.status(401).json({
-        success: false,
-        error: 'No access token found for shop'
-      });
-    }
-
     const shopDomain = shop.includes('.') ? shop : `${shop}.myshopify.com`;
     const shopifyUrl = `https://${shopDomain}/admin/api/2024-07/products.json?limit=50`;
 
