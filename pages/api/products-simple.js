@@ -1,6 +1,5 @@
 /**
- * Products API - using EXACT same pattern as verification
- * Send products to backend (like regenerateCode) then fetch them (like getValidationStatus)
+ * Products API - Get from Shopify, sync to backend, return from backend
  */
 
 import { getAccessToken } from '../../lib/token-storage';
@@ -18,26 +17,46 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Shop parameter required' });
     }
 
-    // Step 1: Get products from Shopify (using normal process)
+    // Get token for THIS shop
     const accessToken = getAccessToken(shop);
+    if (!accessToken) {
+      // Try different format
+      const shopAlt = shop.includes('.') ? shop.replace('.myshopify.com', '') : `${shop}.myshopify.com`;
+      const altToken = getAccessToken(shopAlt);
+
+      if (!altToken) {
+        return res.status(401).json({
+          success: false,
+          error: `No access token found for shop: ${shop}`
+        });
+      }
+    }
+
+    const finalToken = accessToken || getAccessToken(shop.includes('.') ? shop.replace('.myshopify.com', '') : `${shop}.myshopify.com`);
+
+    // Get products from THIS shop's Shopify
     const shopDomain = shop.includes('.') ? shop : `${shop}.myshopify.com`;
     const shopifyUrl = `https://${shopDomain}/admin/api/2024-07/products.json?limit=50`;
 
     const shopifyResponse = await fetch(shopifyUrl, {
       headers: {
-        'X-Shopify-Access-Token': accessToken,
+        'X-Shopify-Access-Token': finalToken,
         'Content-Type': 'application/json',
       },
     });
 
     if (!shopifyResponse.ok) {
-      throw new Error(`Failed to fetch from Shopify: ${shopifyResponse.status}`);
+      return res.status(shopifyResponse.status).json({
+        success: false,
+        error: `Shopify API error: ${shopifyResponse.status}`,
+        shop: shop
+      });
     }
 
     const shopifyData = await shopifyResponse.json();
     const shopifyProducts = shopifyData.products || [];
 
-    // Step 2: Send products to backend (like regenerateCode sends code)
+    // Sync each product to backend
     for (const product of shopifyProducts) {
       const productData = {
         id: product.id.toString(),
@@ -46,12 +65,12 @@ export default async function handler(req, res) {
         status: product.status,
         productType: product.product_type,
         vendor: product.vendor,
-        tags: product.tags,
+        tags: product.tags || [],
         variants: product.variants?.map(variant => ({
           id: variant.id.toString(),
           price: parseFloat(variant.price),
           sku: variant.sku,
-          inventoryQuantity: variant.inventory_quantity
+          inventoryQuantity: variant.inventory_quantity || 0
         })) || [],
         createdAt: product.created_at,
         updatedAt: product.updated_at
@@ -60,29 +79,23 @@ export default async function handler(req, res) {
       await apiClient.syncProduct(shop, productData);
     }
 
-    // Step 3: Get products from backend (like getValidationStatus gets status)
-    const response = await apiClient.getProducts(shop);
+    // Get products from backend
+    const backendResponse = await apiClient.getProducts(shop);
 
-    if (response.success) {
-      res.status(200).json({
-        success: true,
-        shop: shop,
-        products: response.data || [],
-        message: 'Products synced and fetched from backend'
-      });
-    } else {
-      res.status(500).json({
-        success: false,
-        error: response.error || 'Failed to fetch products from backend'
-      });
-    }
+    res.status(200).json({
+      success: true,
+      shop: shop,
+      products: backendResponse.data || [],
+      syncedCount: shopifyProducts.length,
+      message: `Synced ${shopifyProducts.length} products from Shopify to backend`
+    });
 
   } catch (error) {
-    console.error('Products API error:', error);
+    console.error('Products sync error:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to sync/fetch products',
-      message: error.message
+      error: error.message,
+      shop: req.query.shop
     });
   }
 }
