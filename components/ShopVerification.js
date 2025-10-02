@@ -88,6 +88,7 @@ export default function ShopVerification({ shopId, onVerificationComplete }) {
     );
   }
 
+  //
   if (verificationStatus?.is_validated) {
     return (
       <Card>
