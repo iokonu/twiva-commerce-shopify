@@ -30,6 +30,25 @@ export default function Home() {
     loadCommissionRates();
   }, []);
 
+  const loadCommissionRates = async () => {
+    try {
+      // For now, just set some sample commission rates
+      const sampleRates = [
+        { category: 'Phones & Tablets', subcategory: 'Phones', rate: 4 },
+        { category: 'Phones & Tablets', subcategory: 'Accessories', rate: 4 },
+        { category: 'Electronics', subcategory: 'Computing & Gaming', rate: 6 },
+        { category: 'Electronics', subcategory: 'Cameras', rate: 11 },
+        { category: 'Fashion', subcategory: 'Men', rate: 11 },
+        { category: 'Fashion', subcategory: 'Women', rate: 11 },
+        { category: 'Beauty & Health', subcategory: 'Makeup', rate: 12 },
+        { category: 'Other', subcategory: 'Uncategorized', rate: 15 }
+      ];
+      setCommissionRates(sampleRates);
+    } catch (err) {
+      console.error('Failed to load commission rates:', err);
+    }
+  };
+
   const checkAuthAndLoadData = async () => {
     try {
       if (selectedTab === 1) {
